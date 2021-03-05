@@ -22,12 +22,14 @@ app = Flask(__name__)
 @app.route("/")
 def home():
     return (
+        f"Welcome to the climate page for the State of Hawaii"
+        f"<br> <br>"
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/start<br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/min_max_avg/<start><br/>"
+        f"/api/v1.0/min_max_avg/<start><end>"
 
     )
 
@@ -89,10 +91,11 @@ def tobs():
 
     return jsonify(all_tobs)
 
-@app.route("/api/v1.0/start")
-def calc_start_temps():
+@app.route("/api/v1.0/min_max_avg/<start>")
+def calc_start_temps(start):
     session = Session(engine)
-    start_date = dt.strptime('2016-08-23', '%Y-%m-%d').date()
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d')
+
     start_results = session.query(func.avg(Measurement.tobs),func.max(Measurement.tobs),func.min(Measurement.tobs).\
                filter(Measurement.date >= start_date))
     session.close()
@@ -100,12 +103,40 @@ def calc_start_temps():
     start_tobs_df = []   
     for tmax,tmin,tavg in start_results:
        start_tobs_dict = {}
+       start_tobs_dict['Start_Date'] = start_date
        start_tobs_dict["tMin"] = float(tmin)                     
        start_tobs_dict["tMax"] = float(tmax)
        start_tobs_dict["tAvg"] = float(tavg)
        start_tobs_df.append(start_tobs_dict)
     
     return jsonify(start_tobs_df)
+
+@app.route("/api/v1.0/min_max_avg/<start>/<end>")
+def start_end(start, end):
+    session = Session(engine)
+
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d')
+    end_date = dt.datetime.strptime(end, "%Y-%m-%d")
+
+    # query data for the start date value
+    results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start_date).filter(Measurement.date <= end_date)
+
+    session.close()
+
+    # Create a list to hold results
+    start_tobs_df = []
+    for tmin, tmax, tavg in results:
+       start_tobs_dict = {}
+       start_tobs_dict['Start_Date'] = start_date
+       start_tobs_dict['End_Date'] = end_date
+       start_tobs_dict["tMin"] = float(tmin)                     
+       start_tobs_dict["tMax"] = float(tmax)
+       start_tobs_dict["tAvg"] = float(tavg)
+       start_tobs_df.append(start_tobs_dict)
+
+    # jsonify the result
+    return jsonify(start_tobs_df)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
